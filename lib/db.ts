@@ -7,7 +7,7 @@ let sqliteDb: Database.Database | null = null;
 
 function getDb(): Database.Database {
   if (!sqliteDb) {
-    const dbPath = path.join(process.cwd(), "data", "inventory.db");
+    const dbPath = process.env.NODE_ENV === 'production' ? ':memory:' : path.join(process.cwd(), "data", "inventory.db");
     sqliteDb = new Database(dbPath);
 
     // Initialize database tables
