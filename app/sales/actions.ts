@@ -53,28 +53,28 @@ export async function addSaleAction(
   const total = product.price * form.quantity;
   const saleId = `sale-${Date.now()}`;
 
-  await db.transaction(async (tx) => {
-    await tx.run(
-      `INSERT INTO sales
-       (id, productId, quantity, price, total, date, salesPersonId, paymentMode)
-       VALUES (?,?,?,?,?,?,?,?)`,
-      [
-        saleId,
-        form.productId,
-        form.quantity,
-        product.price,
-        total,
-        new Date().toISOString(),
-        form.salesPersonId,
-        form.paymentMode,
-      ]
-    );
+    db.transaction((tx) => {
+      tx.run(
+        `INSERT INTO sales
+         (id, productId, quantity, price, total, date, salesPersonId, paymentMode)
+         VALUES (?,?,?,?,?,?,?,?)`,
+        [
+          saleId,
+          form.productId,
+          form.quantity,
+          product.price,
+          total,
+          new Date().toISOString(),
+          form.salesPersonId,
+          form.paymentMode,
+        ]
+      );
 
-    await tx.run(
-      "UPDATE products SET quantity = quantity - ? WHERE id = ?",
-      [form.quantity, form.productId]
-    );
-  });
+      tx.run(
+        "UPDATE products SET quantity = quantity - ? WHERE id = ?",
+        [form.quantity, form.productId]
+      );
+    });
 
   revalidatePath("/sales");
 }
@@ -88,9 +88,9 @@ export async function deleteSaleAction(saleId: string) {
 
   if (!sale) throw new Error("Sale not found");
 
-  await db.transaction(async (tx) => {
-    await tx.run("DELETE FROM sales WHERE id = ?", [saleId]);
-    await tx.run(
+  db.transaction((tx) => {
+    tx.run("DELETE FROM sales WHERE id = ?", [saleId]);
+    tx.run(
       "UPDATE products SET quantity = quantity + ? WHERE id = ?",
       [sale.quantity, sale.productId]
     );

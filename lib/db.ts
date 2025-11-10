@@ -121,4 +121,7 @@ export const database: {
   },
 };
 
+// Initialize database on module load to ensure tables and admin user are created
+getDb();
+
 export { getDb as rawClient };
