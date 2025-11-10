@@ -75,7 +75,6 @@ export async function addSaleAction(
       [form.quantity, form.productId]
     );
   });
-
   revalidatePath("/sales");
 }
 

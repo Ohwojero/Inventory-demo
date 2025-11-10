@@ -1,6 +1,6 @@
 // lib/db.ts
 import Database, { Database as DatabaseType } from "better-sqlite3";
-import { hash } from "bcrypt";
+import { hashSync } from "bcrypt";
 import path from "path";
 
 const dbPath = path.join(process.cwd(), "data", "inventory.db");
@@ -52,13 +52,21 @@ sqliteDb.exec(`
 `);
 
 // Insert default admin user if not exists
-const adminPassword = hash("admin123", 10).then((hashed) => {
-  const insertAdmin = sqliteDb.prepare(`
-    INSERT OR IGNORE INTO users (id, email, password, name, role)
-    VALUES (?, ?, ?, ?, ?)
-  `);
-  insertAdmin.run('admin1', 'admin@inventory.com', hashed, 'Admin User', 'admin');
-});
+const adminPassword = hashSync("admin123", 10);
+const insertAdmin = sqliteDb.prepare(`
+  INSERT OR IGNORE INTO users (id, email, password, name, role)
+  VALUES (?, ?, ?, ?, ?)
+`);
+insertAdmin.run('admin1', 'admin@inventory.com', adminPassword, 'Admin User', 'admin');
+
+// Insert sample products if not exists
+const insertProduct = sqliteDb.prepare(`
+  INSERT OR IGNORE INTO products (id, name, sku, quantity, reorderLevel, price, cost, category)
+  VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+`);
+insertProduct.run('prod1', 'Sample Product 1', 'SKU001', 100, 10, 50.00, 30.00, 'Electronics');
+insertProduct.run('prod2', 'Sample Product 2', 'SKU002', 200, 20, 25.00, 15.00, 'Clothing');
+insertProduct.run('prod3', 'Sample Product 3', 'SKU003', 150, 15, 75.00, 45.00, 'Home Goods');
 
 export const database: {
   all<T = any>(sql: string, params?: any[]): T[];
@@ -82,7 +90,7 @@ export const database: {
   },
 
   transaction<T>(fn: (tx: any) => T): T {
-    return sqliteDb.transaction(fn)(sqliteDb);
+    return (sqliteDb.transaction(fn) as any);
   },
 };
 

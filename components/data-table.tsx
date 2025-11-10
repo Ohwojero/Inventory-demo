@@ -1,7 +1,6 @@
 "use client"
 
 import type React from "react"
-
 import { useState, useMemo } from "react"
 import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
@@ -20,7 +19,6 @@ interface DataTableProps {
   searchPlaceholder?: string
   onSearch?: (query: string) => void
 }
-
 export function DataTable({
   columns,
   data,
