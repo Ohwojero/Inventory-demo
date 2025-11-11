@@ -1,9 +1,4 @@
-
-
-
 // lib/db.ts
-'use server'
-
 import sqlite3 from 'sqlite3';
 import { hashSync } from "bcrypt";
 import path from "path";
