@@ -24,7 +24,8 @@ import {
   Tooltip,
   ResponsiveContainer,
 } from "recharts";
-import { TrendingUp, Download, Printer } from "lucide-react";
+import { TrendingUp, Download, Printer, FileSpreadsheet } from "lucide-react";
+import * as XLSX from "xlsx";
 import { Sidebar } from "@/components/sidebar";
 import { Button } from "@/components/ui/button";
 
@@ -168,6 +169,88 @@ export default function ReportsPage() {
 
   const printReports = () => window.print();
 
+  // ---------- Excel ----------
+  const downloadReportsAsExcel = () => {
+    const profitMargin =
+      totalRevenue > 0 ? ((netProfit / totalRevenue) * 100).toFixed(1) : "0";
+    const avgPrice =
+      products.length > 0
+        ? (
+            products.reduce((sum, p) => sum + p.price, 0) / products.length
+          ).toFixed(2)
+        : "0.00";
+
+    // Summary sheet data
+    const summaryData = [
+      ["Business Reports Summary"],
+      ["Generated on", new Date().toLocaleString()],
+      [],
+      ["Key Metrics"],
+      ["Total Revenue", `₦${totalRevenue.toFixed(2)}`],
+      ["Total Expenses", `₦${totalExpenses.toFixed(2)}`],
+      ["Net Profit", `₦${netProfit.toFixed(2)}`],
+      ["Inventory Value", `₦${totalInventoryValue.toFixed(2)}`],
+      ["Total Products", products.length],
+      ["Total Sales Transactions", sales.length],
+      ["Low Stock Items", lowStockProducts.length],
+      ["Profit Margin", `${profitMargin}%`],
+      ["Average Product Price", `₦${avgPrice}`],
+    ];
+
+    // Sales sheet data
+    const salesData = [
+      ["Sales Transactions"],
+      ["Product ID", "Quantity", "Total Amount"],
+      ...sales.map((sale) => [sale.productId, sale.quantity, `₦${sale.total.toFixed(2)}`]),
+    ];
+
+    // Products sheet data
+    const productsData = [
+      ["Products Inventory"],
+      ["ID", "Name", "Quantity", "Reorder Level", "Cost", "Price", "Current Value"],
+      ...products.map((product) => [
+        product.id,
+        product.name,
+        product.quantity,
+        product.reorderLevel,
+        `₦${product.cost.toFixed(2)}`,
+        `₦${product.price.toFixed(2)}`,
+        `₦${(product.quantity * product.cost).toFixed(2)}`,
+      ]),
+    ];
+
+    // Expenses sheet data
+    const expensesData = [
+      ["Expenses"],
+      ["Category", "Amount"],
+      ...expenses.map((expense) => [expense.category, `₦${expense.amount.toFixed(2)}`]),
+    ];
+
+    // Sales by Product sheet
+    const salesByProductData = [
+      ["Sales by Product"],
+      ["Product Name", "Number of Sales", "Total Revenue"],
+      ...salesByProduct.map((item) => [
+        item.name,
+        item.sales,
+        `₦${item.revenue.toFixed(2)}`,
+      ]),
+    ];
+
+    // Create workbook
+    const wb = XLSX.utils.book_new();
+
+    // Add sheets
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(summaryData), "Summary");
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(salesData), "Sales");
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(productsData), "Products");
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(expensesData), "Expenses");
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(salesByProductData), "Sales by Product");
+
+    // Generate and download file
+    XLSX.writeFile(wb, `business_reports_${new Date().toISOString().split("T")[0]}.xlsx`);
+  };
+
   // ---------- Loading / Auth guard ----------
   if (loading) {
     return (
@@ -203,6 +286,13 @@ export default function ReportsPage() {
             >
               <Download className="w-4 h-4 mr-2" />
               CSV
+            </Button>
+            <Button
+              onClick={downloadReportsAsExcel}
+              className="bg-gradient-to-r from-emerald-600 to-emerald-700 hover:from-emerald-700 hover:to-emerald-800 text-white"
+            >
+              <FileSpreadsheet className="w-4 h-4 mr-2" />
+              Excel
             </Button>
             <Button
               onClick={printReports}
