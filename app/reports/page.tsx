@@ -49,6 +49,7 @@ export default function ReportsPage() {
   const [sales, setSales] = useState<Sale[]>([]);
   const [expenses, setExpenses] = useState<Expense[]>([]);
   const [loading, setLoading] = useState(true);
+  // Just a comment 
 
   // ---------- Load data ----------
   useEffect(() => {
