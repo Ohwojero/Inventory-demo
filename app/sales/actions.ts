@@ -1,7 +1,7 @@
 // app/sales/actions.ts
 "use server";
 
-import { database as db } from "@/lib/db";
+import { db } from "@/lib/db";
 import { revalidatePath } from "next/cache";
 import type { Product, Sale, User } from "@/lib/types";
 
@@ -53,28 +53,28 @@ export async function addSaleAction(
   const total = product.price * form.quantity;
   const saleId = `sale-${Date.now()}`;
 
-    await db.transaction(async (tx) => {
-      await tx.run(
-        `INSERT INTO sales
-         (id, productId, quantity, price, total, date, salesPersonId, paymentMode)
-         VALUES (?,?,?,?,?,?,?,?)`,
-        [
-          saleId,
-          form.productId,
-          form.quantity,
-          product.price,
-          total,
-          new Date().toISOString(),
-          form.salesPersonId,
-          form.paymentMode,
-        ]
-      );
+  await db.transaction(async (tx) => {
+    await tx.run(
+      `INSERT INTO sales
+       (id, productId, quantity, price, total, date, salesPersonId, paymentMode)
+       VALUES (?,?,?,?,?,?,?,?)`,
+      [
+        saleId,
+        form.productId,
+        form.quantity,
+        product.price,
+        total,
+        new Date().toISOString(),
+        form.salesPersonId,
+        form.paymentMode,
+      ]
+    );
 
-      await tx.run(
-        "UPDATE products SET quantity = quantity - ? WHERE id = ?",
-        [form.quantity, form.productId]
-      );
-    });
+    await tx.run(
+      "UPDATE products SET quantity = quantity - ? WHERE id = ?",
+      [form.quantity, form.productId]
+    );
+  });
 
   revalidatePath("/sales");
 }

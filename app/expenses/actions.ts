@@ -1,7 +1,7 @@
 // app/expenses/actions.ts
 "use server";
 
-import { database as db } from "@/lib/db";
+import { db } from "@/lib/db";
 import { revalidatePath } from "next/cache";
 
 export interface Expense {

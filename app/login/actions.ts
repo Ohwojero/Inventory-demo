@@ -1,11 +1,11 @@
 'use server'
 
-import { database as db } from '@/lib/db'
+import { db } from '@/lib/db'
 import { compare } from 'bcrypt'
 
 export async function authenticateUser(email: string, password: string) {
   try {
-    const user = await db.get('SELECT * FROM users WHERE email = ?', [email])
+    const user = await db.get('SELECT * FROM users WHERE email = ?', [email]) as any
 
     if (!user) return null
 

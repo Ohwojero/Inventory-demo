@@ -12,6 +12,8 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { AlertCircle } from "lucide-react"
 import { Alert, AlertDescription } from "@/components/ui/alert"
+import { compare } from 'bcrypt'
+import { db } from '@/lib/db' 
 import { authenticateUser } from './actions'
 
 
@@ -33,7 +35,7 @@ export default function LoginPage() {
       const user = await authenticateUser(email, password)
 
       if (!user) {
-        setError("Invalid email or password.")
+        setError("Invalid email or password. Try admin@inventory.com / admin123")
         setIsLoading(false)
         return
       }

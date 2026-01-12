@@ -1,6 +1,6 @@
 'use server'
 
-import { database as db } from '@/lib/db'
+import { db } from '@/lib/db'
 import { hash } from 'bcrypt'
 import { revalidatePath } from 'next/cache'
 

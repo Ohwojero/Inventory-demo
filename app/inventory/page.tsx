@@ -76,14 +76,9 @@ export default function InventoryPage() {
     }
 
     (async () => {
-      try {
-        const data = await getProducts();
-        setProducts(data);
-      } catch (err: any) {
-        alert("Failed to load products: " + (err.message ?? "Unknown error"));
-      } finally {
-        setLoading(false);
-      }
+      const data = await getProducts();
+      setProducts(data);
+      setLoading(false);
     })();
   }, [isAuthenticated, router]);
 
@@ -334,7 +329,7 @@ export default function InventoryPage() {
                       placeholder="e.g., Laptop"
                       value={form.name}
                       onChange={(e) =>
-                        setForm({ ...form, name: e.target.value.trim() })
+                        setForm({ ...form, name: e.target.value })
                       }
                       required
                     />
@@ -346,7 +341,7 @@ export default function InventoryPage() {
                       placeholder="e.g., LAP-001"
                       value={form.sku}
                       onChange={(e) =>
-                        setForm({ ...form, sku: e.target.value.trim() })
+                        setForm({ ...form, sku: e.target.value })
                       }
                       required
                     />
