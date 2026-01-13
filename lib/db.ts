@@ -1,145 +1,193 @@
 // lib/db.ts
-import { createClient } from "@libsql/client/web";
-import { hash } from "bcrypt";
+import { createClient, type Client, type ResultSet } from "@libsql/client";
+import path from "node:path";
+import { hashSync } from "bcrypt"; // or "bcryptjs" if you prefer
 
-let libsqlClient: any = null;
+// ────────────────────────────────────────────────
+// Allowed parameter types for libsql bindings
+// ────────────────────────────────────────────────
+type SqlParams = Array<null | string | number | Uint8Array | bigint | boolean>;
 
-async function getDb() {
-  if (!libsqlClient) {
-    const dbUrl = process.env.NODE_ENV === 'production' ? ':memory:' : `file:${path.join(process.cwd(), "data", "inventory.db")}`;
-    libsqlClient = createClient({ url: dbUrl });
+// ────────────────────────────────────────────────
+// Singleton client + lazy initialization
+// ────────────────────────────────────────────────
 
-    // Initialize database tables
-    await libsqlClient.execute(`
-      CREATE TABLE IF NOT EXISTS users (
-        id TEXT PRIMARY KEY,
-        email TEXT UNIQUE NOT NULL,
-        password TEXT NOT NULL,
-        name TEXT NOT NULL,
-        role TEXT NOT NULL CHECK(role IN ('admin', 'manager', 'salesgirl'))
+let libsqlClient: Client | null = null;
+let initializationPromise: Promise<void> | null = null;
+
+async function initializeDatabase(): Promise<void> {
+  if (libsqlClient) return;
+
+  const isProduction = process.env.USE_TURSO_PRODUCTION === "true";
+
+  let databaseUrl: string;
+  let authToken: string | undefined;
+
+  if (isProduction) {
+    // PRODUCTION: Use Turso remote (strongly recommended)
+    databaseUrl = process.env.TURSO_DATABASE_URL ?? "";
+    authToken = process.env.TURSO_AUTH_TOKEN;
+
+    if (!databaseUrl || !authToken) {
+      throw new Error(
+        "Missing TURSO_DATABASE_URL or TURSO_AUTH_TOKEN env variables in production"
       );
-    `);
+    }
+  } else {
+    // DEVELOPMENT: local file-based SQLite
+    const dbFolder = path.join(process.cwd(), "data");
+    const dbPath = path.join(dbFolder, "inventory.db");
+    databaseUrl = `file:${dbPath}`;
 
-    await libsqlClient.execute(`
-      CREATE TABLE IF NOT EXISTS products (
-        id TEXT PRIMARY KEY,
-        name TEXT NOT NULL,
-        sku TEXT UNIQUE NOT NULL,
-        quantity INTEGER NOT NULL,
-        reorderLevel INTEGER NOT NULL,
-        price REAL NOT NULL,
-        cost REAL NOT NULL,
-        category TEXT NOT NULL
-      );
-    `);
+    // Optional: you can manually create the folder or add:
+    // await import("node:fs/promises").then(fs => fs.mkdir(dbFolder, { recursive: true }).catch(() => {}));
+  }
 
-    await libsqlClient.execute(`
-      CREATE TABLE IF NOT EXISTS sales (
-        id TEXT PRIMARY KEY,
-        productId TEXT NOT NULL,
-        quantity INTEGER NOT NULL,
-        price REAL NOT NULL,
-        total REAL NOT NULL,
-        date TEXT NOT NULL,
-        salesPersonId TEXT NOT NULL,
-        paymentMode TEXT NOT NULL CHECK(paymentMode IN ('POS', 'transfer', 'cash')),
-        FOREIGN KEY (productId) REFERENCES products(id),
-        FOREIGN KEY (salesPersonId) REFERENCES users(id)
-      );
-    `);
+  console.log(`[DB] Connecting to → ${databaseUrl}`);
 
-    await libsqlClient.execute(`
-      CREATE TABLE IF NOT EXISTS expenses (
-        id TEXT PRIMARY KEY,
-        description TEXT NOT NULL,
-        amount REAL NOT NULL,
-        category TEXT NOT NULL,
-        date TEXT NOT NULL,
-        createdBy TEXT NOT NULL,
-        FOREIGN KEY (createdBy) REFERENCES users(id)
-      );
-    `);
+  libsqlClient = createClient({
+    url: databaseUrl,
+    authToken,
+  });
 
-    // Insert default admin user if not exists
-    const adminPassword = hashSync("admin123", 10);
-    await libsqlClient.execute(`
+  // ── Create tables ─────────────────────────────────────────────
+  await libsqlClient.execute(`
+    CREATE TABLE IF NOT EXISTS users (
+      id          TEXT PRIMARY KEY,
+      email       TEXT UNIQUE NOT NULL,
+      password    TEXT NOT NULL,
+      name        TEXT NOT NULL,
+      role        TEXT NOT NULL CHECK(role IN ('admin', 'manager', 'salesgirl'))
+    );
+  `);
+
+  await libsqlClient.execute(`
+    CREATE TABLE IF NOT EXISTS products (
+      id           TEXT PRIMARY KEY,
+      name         TEXT NOT NULL,
+      sku          TEXT UNIQUE NOT NULL,
+      quantity     INTEGER NOT NULL,
+      reorderLevel INTEGER NOT NULL,
+      price        REAL NOT NULL,
+      cost         REAL NOT NULL,
+      category     TEXT NOT NULL
+    );
+  `);
+
+  await libsqlClient.execute(`
+    CREATE TABLE IF NOT EXISTS sales (
+      id            TEXT PRIMARY KEY,
+      productId     TEXT NOT NULL,
+      quantity      INTEGER NOT NULL,
+      price         REAL NOT NULL,
+      total         REAL NOT NULL,
+      date          TEXT NOT NULL,
+      salesPersonId TEXT NOT NULL,
+      paymentMode   TEXT NOT NULL CHECK(paymentMode IN ('POS', 'transfer', 'cash')),
+      FOREIGN KEY (productId)     REFERENCES products(id),
+      FOREIGN KEY (salesPersonId) REFERENCES users(id)
+    );
+  `);
+
+  await libsqlClient.execute(`
+    CREATE TABLE IF NOT EXISTS expenses (
+      id          TEXT PRIMARY KEY,
+      description TEXT NOT NULL,
+      amount      REAL NOT NULL,
+      category    TEXT NOT NULL,
+      date        TEXT NOT NULL,
+      createdBy   TEXT NOT NULL,
+      FOREIGN KEY (createdBy) REFERENCES users(id)
+    );
+  `);
+
+  // ── Seed default data (runs only once thanks to OR IGNORE) ───
+  const adminHashed = hashSync("admin123", 10);
+
+  await libsqlClient.execute(
+    `
       INSERT OR IGNORE INTO users (id, email, password, name, role)
       VALUES (?, ?, ?, ?, ?)
-    `, ['admin1', 'admin@inventory.com', adminPassword, 'Admin User', 'admin']);
+    `,
+    ["admin1", "admin@inventory.com", adminHashed, "Admin User", "admin"]
+  );
 
-    // Insert sample products if not exists
-    await libsqlClient.execute(`
+  await libsqlClient.execute(
+    `
       INSERT OR IGNORE INTO products (id, name, sku, quantity, reorderLevel, price, cost, category)
       VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-    `, ['prod1', 'Sample Product 1', 'SKU001', 100, 10, 50.00, 30.00, 'Electronics']);
+    `,
+    ["prod1", "Sample Product 1", "SKU001", 100, 10, 50.00, 30.00, "Electronics"]
+  );
 
-    await libsqlClient.execute(`
+  await libsqlClient.execute(
+    `
       INSERT OR IGNORE INTO products (id, name, sku, quantity, reorderLevel, price, cost, category)
       VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-    `, ['prod2', 'Sample Product 2', 'SKU002', 200, 20, 25.00, 15.00, 'Clothing']);
+    `,
+    ["prod2", "Sample Product 2", "SKU002", 200, 20, 25.00, 15.00, "Clothing"]
+  );
 
-    await libsqlClient.execute(`
+  await libsqlClient.execute(
+    `
       INSERT OR IGNORE INTO products (id, name, sku, quantity, reorderLevel, price, cost, category)
       VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-    `, ['prod3', 'Sample Product 3', 'SKU003', 150, 15, 75.00, 45.00, 'Home Goods']);
+    `,
+    ["prod3", "Sample Product 3", "SKU003", 150, 15, 75.00, 45.00, "Home Goods"]
+  );
+
+  console.log("[DB] Initialization & seeding completed");
+}
+
+// ────────────────────────────────────────────────
+// Lazy getter for the client
+// ────────────────────────────────────────────────
+
+async function getInitializedClient(): Promise<Client> {
+  if (!initializationPromise) {
+    initializationPromise = initializeDatabase().catch((err) => {
+      console.error("[DB INIT ERROR]", err);
+      throw err;
+    });
   }
+
+  await initializationPromise;
+
+  if (!libsqlClient) {
+    throw new Error("Database client not initialized");
+  }
+
   return libsqlClient;
 }
 
-let initPromise: Promise<void> | null = null;
-if (!initPromise) {
-  initPromise = initDb().catch((e) => {
-    console.error("DB init failed:", e);
-    throw e;
-  });
-}
+// ────────────────────────────────────────────────
+// Public database wrapper
+// ────────────────────────────────────────────────
 
 interface Database {
-  all<T = any>(sql: string, params?: any[]): Promise<T[]>;
-  get<T = any>(sql: string, params?: any[]): Promise<T | null>;
-  run(sql: string, params?: any[]): Promise<void>;
-  transaction<T>(fn: (tx: Database) => Promise<T>): Promise<T>;
+  all<T = unknown>(sql: string, params?: SqlParams): Promise<T[]>;
+  get<T = unknown>(sql: string, params?: SqlParams): Promise<T | null>;
+  run(sql: string, params?: SqlParams): Promise<void>;
 }
 
-const db: Database = {
-  async all<T = any>(sql: string, params?: any[]): Promise<T[]> {
-    await initPromise;
-    const result = await client.execute({ sql, args: params || [] });
+export const db: Database = {
+  async all<T = unknown>(sql: string, params: SqlParams = []): Promise<T[]> {
+    const client = await getInitializedClient();
+    const result: ResultSet = await client.execute({ sql, args: params });
     return result.rows as T[];
   },
 
-  async get<T = any>(sql: string, params?: any[]): Promise<T | null> {
-    await initPromise;
-    const result = await client.execute({ sql, args: params || [] });
-    return (result.rows[0] ?? null) as T | null;
+  async get<T = unknown>(sql: string, params: SqlParams = []): Promise<T | null> {
+    const client = await getInitializedClient();
+    const result: ResultSet = await client.execute({ sql, args: params });
+    return (result.rows[0] as T) ?? null;
   },
 
-  async run(sql: string, params?: any[]): Promise<void> {
-    await initPromise;
-    await client.execute({ sql, args: params || [] });
-  },
-
-  async transaction<T>(fn: (tx: Database) => Promise<T>): Promise<T> {
-    await initPromise;
-    const tx = await client.transaction();
-    try {
-      const txDb: Database = {
-        all: <U = any>(sql: string, params?: any[]) => tx.execute({ sql, args: params || [] }).then((r: any) => r.rows as U[]),
-        get: <U = any>(sql: string, params?: any[]) => tx.execute({ sql, args: params || [] }).then((r: any) => (r.rows[0] ?? null) as U | null),
-        run: (sql: string, params?: any[]) => tx.execute({ sql, args: params || [] }).then(() => {}),
-        transaction: <U>(_: (tx: Database) => Promise<U>): Promise<U> => { throw new Error("Nested transactions not supported"); },
-      };
-      const result = await fn(txDb);
-      await tx.commit();
-      return result;
-    } catch (e) {
-      await tx.rollback();
-      throw e;
-    }
+  async run(sql: string, params: SqlParams = []): Promise<void> {
+    const client = await getInitializedClient();
+    await client.execute({ sql, args: params });
   },
 };
 
-export { db };
-export { db as database };
-
-export { client as rawClient };
+// Optional: for raw access when needed
+export const getRawClient = getInitializedClient;

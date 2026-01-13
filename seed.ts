@@ -1,4 +1,4 @@
-import { db } from './lib/db'
+import { db } from './lib/db.ts'
 
 async function seed() {
   console.log('Seeding database...')

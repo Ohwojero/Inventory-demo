@@ -199,99 +199,6 @@ export default function SalesPage() {
     }
   };
 
-  // ---------- Excel Export ----------
-  const generateExcel = async () => {
-    if (!data) return;
-    try {
-      const { utils, writeFile } = await import("xlsx");
-
-      // Prepare data for Excel
-      const excelData: any[] = data.sales.map((s) => ({
-        Product: s.productName ?? "—",
-        Qty: s.quantity,
-        Unit: s.price,
-        Total: s.total,
-        "Sales Person": s.salesPersonName ?? "—",
-        Date: new Date(s.date).toLocaleDateString(),
-        Mode: s.paymentMode,
-      }));
-
-      // Add summary rows
-      excelData.push({
-        Product: "",
-        Qty: "",
-        Unit: "",
-        Total: "",
-        "Sales Person": "",
-        Date: "",
-        Mode: "",
-      });
-      excelData.push({
-        Product: "SUMMARY",
-        Qty: "",
-        Unit: "",
-        Total: "",
-        "Sales Person": "",
-        Date: "",
-        Mode: "",
-      });
-      excelData.push({
-        Product: "Total Sales",
-        Qty: data.totalSales,
-        Unit: "",
-        Total: "",
-        "Sales Person": "",
-        Date: "",
-        Mode: "",
-      });
-      excelData.push({
-        Product: "Revenue",
-        Qty: data.totalRevenue,
-        Unit: "",
-        Total: "",
-        "Sales Person": "",
-        Date: "",
-        Mode: "",
-      });
-      excelData.push({
-        Product: "Average Order Value",
-        Qty: data.averageOrderValue,
-        Unit: "",
-        Total: "",
-        "Sales Person": "",
-        Date: "",
-        Mode: "",
-      });
-
-      // Create worksheet
-      const ws = utils.json_to_sheet(excelData);
-
-      // Set column widths
-      ws["!cols"] = [
-        { wch: 20 }, // Product
-        { wch: 5 },  // Qty
-        { wch: 10 }, // Unit
-        { wch: 10 }, // Total
-        { wch: 15 }, // Sales Person
-        { wch: 12 }, // Date
-        { wch: 8 },  // Mode
-      ];
-
-      // Create workbook
-      const wb = utils.book_new();
-      utils.book_append_sheet(wb, ws, "Sales Report");
-
-      // Add title
-      utils.sheet_add_aoa(ws, [["Mr. TP - Sales Report"]], { origin: "A1" });
-      utils.sheet_add_aoa(ws, [[`Generated on ${new Date().toLocaleDateString()}`]], { origin: "A2" });
-
-      // Save file
-      writeFile(wb, "sales-report.xlsx");
-    } catch (e) {
-      alert("Excel export error");
-    }
-  };
-
   const printSales = () => window.print();
 
   // ---------- Excel ----------
@@ -691,7 +598,7 @@ export default function SalesPage() {
             <DataTable
               columns={tableColumns}
               data={data.sales}
-              itemsPerPage={25}
+              itemsPerPage={10}
               searchPlaceholder="Search by product name..."
             />
           </CardContent>
