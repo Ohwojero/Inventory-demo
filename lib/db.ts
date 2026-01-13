@@ -1,7 +1,7 @@
 // lib/db.ts
 import { createClient, type Client, type ResultSet } from "@libsql/client";
 import path from "node:path";
-import { hashSync } from "bcrypt"; // or "bcryptjs" if you prefer
+import { hashSync } from "bcrypt";
 
 // ────────────────────────────────────────────────
 // Allowed parameter types for libsql bindings
