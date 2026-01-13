@@ -168,6 +168,7 @@ interface Database {
   all<T = unknown>(sql: string, params?: SqlParams): Promise<T[]>;
   get<T = unknown>(sql: string, params?: SqlParams): Promise<T | null>;
   run(sql: string, params?: SqlParams): Promise<void>;
+  transaction<T>(callback: (tx: Database) => Promise<T>): Promise<T>;
 }
 
 export const db: Database = {
@@ -186,6 +187,43 @@ export const db: Database = {
   async run(sql: string, params: SqlParams = []): Promise<void> {
     const client = await getInitializedClient();
     await client.execute({ sql, args: params });
+  },
+
+  async transaction<T>(callback: (tx: Database) => Promise<T>): Promise<T> {
+    const client = await getInitializedClient();
+
+    // Begin transaction
+    await client.execute("BEGIN");
+
+    try {
+      const txDb: Database = {
+        all: async <U = unknown>(sql: string, params: SqlParams = []): Promise<U[]> => {
+          const result: ResultSet = await client.execute({ sql, args: params });
+          return result.rows as U[];
+        },
+        get: async <U = unknown>(sql: string, params: SqlParams = []): Promise<U | null> => {
+          const result: ResultSet = await client.execute({ sql, args: params });
+          return (result.rows[0] as U) ?? null;
+        },
+        run: async (sql: string, params: SqlParams = []): Promise<void> => {
+          await client.execute({ sql, args: params });
+        },
+        transaction: async <V>(cb: (tx: Database) => Promise<V>): Promise<V> => {
+          throw new Error("Nested transactions not supported");
+        },
+      };
+
+      const result = await callback(txDb);
+
+      // Commit transaction
+      await client.execute("COMMIT");
+
+      return result;
+    } catch (error) {
+      // Rollback on error
+      await client.execute("ROLLBACK");
+      throw error;
+    }
   },
 };
 
