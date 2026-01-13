@@ -37,7 +37,9 @@ import {
   Download,
   Printer,
   ArrowLeft,
+  FileSpreadsheet,
 } from "lucide-react";
+import * as XLSX from "xlsx";
 
 import { Sidebar } from "@/components/sidebar";
 import { DataTable } from "@/components/data-table";
@@ -199,6 +201,51 @@ export default function SalesPage() {
 
   const printSales = () => window.print();
 
+  // ---------- Excel ----------
+  const downloadSalesAsExcel = () => {
+    if (!data) return;
+
+    // Create sales transactions sheet with all data in one sheet
+    const headers = ["Product", "Qty", "Unit Price", "Total", "Sales Person", "Date", "Payment Mode"];
+
+    // Create 2D array for sales sheet
+    const salesSheetData = [
+      ["Sales Transactions"],
+      ["Generated on", new Date().toLocaleString()],
+      [],
+      headers, // Headers row
+    ];
+
+    // Add all sales data
+    data.sales.forEach((sale) => {
+      salesSheetData.push([
+        sale.productName ?? "—",
+        sale.quantity.toString(),
+        `₦${sale.price.toFixed(2)}`,
+        `₦${sale.total.toFixed(2)}`,
+        sale.salesPersonName ?? "—",
+        new Date(sale.date).toLocaleDateString(),
+        sale.paymentMode,
+      ]);
+    });
+
+    // Add totals at the bottom
+    salesSheetData.push([]); // Empty row
+    salesSheetData.push(["TOTALS"]);
+    salesSheetData.push(["Total Sales", data.totalSales.toString()]);
+    salesSheetData.push(["Total Revenue", `₦${data.totalRevenue.toFixed(2)}`]);
+    salesSheetData.push(["Average Order Value", `₦${data.averageOrderValue.toFixed(2)}`]);
+
+    // Create workbook
+    const wb = XLSX.utils.book_new();
+
+    // Add sales transactions sheet
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(salesSheetData), "Sales Transactions");
+
+    // Generate and download file
+    XLSX.writeFile(wb, `sales-report_${new Date().toISOString().split("T")[0]}.xlsx`);
+  };
+
   // ---------- receipt ----------
   const handleGenerateReceipt = async (saleId: string) => {
     if (!data) return;
@@ -355,6 +402,13 @@ export default function SalesPage() {
             >
               <Download className="w-4 h-4 mr-2" />
               PDF
+            </Button>
+            <Button
+              onClick={downloadSalesAsExcel}
+              className="bg-gradient-to-r from-emerald-600 to-emerald-700 hover:from-emerald-700 hover:to-emerald-800 text-white"
+            >
+              <FileSpreadsheet className="w-4 h-4 mr-2" />
+              Excel
             </Button>
             <Button
               onClick={printSales}
