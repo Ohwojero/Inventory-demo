@@ -1,5 +1,5 @@
 // lib/db.ts
-import { createClient, type Client, type ResultSet } from "@libsql/client";
+import { createClient, type Client, type ResultSet, type Transaction } from "@libsql/client";
 import path from "node:path";
 import { hashSync } from "bcrypt";
 
@@ -192,7 +192,6 @@ export const db: Database = {
   async transaction<T>(callback: (tx: Database) => Promise<T>): Promise<T> {
     const client = await getInitializedClient();
 
-    // Begin transaction
     await client.execute("BEGIN");
 
     try {
@@ -215,13 +214,23 @@ export const db: Database = {
 
       const result = await callback(txDb);
 
-      // Commit transaction
-      await client.execute("COMMIT");
+      try {
+        await client.execute("COMMIT");
+      } catch (commitError) {
+        // If commit fails because transaction was already rolled back, ignore
+        if (!(commitError instanceof Error) || !commitError.message.includes("no transaction is active")) {
+          throw commitError;
+        }
+      }
 
       return result;
     } catch (error) {
-      // Rollback on error
-      await client.execute("ROLLBACK");
+      // Try to rollback, but ignore if already rolled back
+      try {
+        await client.execute("ROLLBACK");
+      } catch (rollbackError) {
+        // Ignore rollback errors
+      }
       throw error;
     }
   },
