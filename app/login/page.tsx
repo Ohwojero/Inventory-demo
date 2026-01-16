@@ -35,7 +35,7 @@ export default function LoginPage() {
       const user = await authenticateUser(email, password)
 
       if (!user) {
-        setError("Invalid email or password. Try admin@inventory.com / admin123")
+        setError("Invalid email or password.")
         setIsLoading(false)
         return
       }
