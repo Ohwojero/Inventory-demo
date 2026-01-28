@@ -18,36 +18,15 @@ let initializationPromise: Promise<void> | null = null;
 async function initializeDatabase(): Promise<void> {
   if (libsqlClient) return;
 
-  const isProduction = process.env.USE_TURSO_PRODUCTION === "true";
-
-  let databaseUrl: string;
-  let authToken: string | undefined;
-
-  if (isProduction) {
-    // PRODUCTION: Use Turso remote (strongly recommended)
-    databaseUrl = process.env.TURSO_DATABASE_URL ?? "";
-    authToken = process.env.TURSO_AUTH_TOKEN;
-
-    if (!databaseUrl || !authToken) {
-      throw new Error(
-        "Missing TURSO_DATABASE_URL or TURSO_AUTH_TOKEN env variables in production"
-      );
-    }
-  } else {
-    // DEVELOPMENT: local file-based SQLite
-    const dbFolder = path.join(process.cwd(), "data");
-    const dbPath = path.join(dbFolder, "inventory.db");
-    databaseUrl = `file:${dbPath}`;
-
-    // Optional: you can manually create the folder or add:
-    // await import("node:fs/promises").then(fs => fs.mkdir(dbFolder, { recursive: true }).catch(() => {}));
-  }
+  // Always use local file-based SQLite
+  const dbFolder = path.join(process.cwd(), "data");
+  const dbPath = path.join(dbFolder, "inventory.db");
+  const databaseUrl = `file:${dbPath}`;
 
   console.log(`[DB] Connecting to → ${databaseUrl}`);
 
   libsqlClient = createClient({
     url: databaseUrl,
-    authToken,
   });
 
   // ── Create tables ─────────────────────────────────────────────
