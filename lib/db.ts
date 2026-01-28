@@ -18,10 +18,20 @@ let initializationPromise: Promise<void> | null = null;
 async function initializeDatabase(): Promise<void> {
   if (libsqlClient) return;
 
-  // Always use local file-based SQLite
-  const dbFolder = path.join(process.cwd(), "data");
-  const dbPath = path.join(dbFolder, "inventory.db");
-  const databaseUrl = `file:${dbPath}`;
+  let databaseUrl: string;
+
+  if (process.env.VERCEL) {
+    // On Vercel, use in-memory database for demo
+    databaseUrl = ":memory:";
+  } else {
+    // DEVELOPMENT: local file-based SQLite
+    const dbFolder = path.join(process.cwd(), "data");
+    const dbPath = path.join(dbFolder, "inventory.db");
+    databaseUrl = `file:${dbPath}`;
+
+    // Optional: you can manually create the folder or add:
+    // await import("node:fs/promises").then(fs => fs.mkdir(dbFolder, { recursive: true }).catch(() => {}));
+  }
 
   console.log(`[DB] Connecting to → ${databaseUrl}`);
 
